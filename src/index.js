@@ -2,6 +2,9 @@ const puppeteer = require("puppeteer");
 const axios = require('axios')
 const fs = require('fs')
 const opn = require("opn");
+const request = require('request')
+const cheerio = require('cheerio')
+const iconv = require("iconv-lite");
 
 const defaultInfo = {
     header:{
@@ -69,9 +72,6 @@ function getRandomInt(min, max) {
 
 
 
-
-console.log("SSDSDSD")
-
 // 扫码逻辑
 async function requestScan() {
     console.log("开始读取扫码信息")
@@ -136,10 +136,110 @@ async function listenScan() {
 }
 
 
+async function goodPrice(stockId){
+    const callback = {};
+    let name;
+    let price;
+    callback[(name = "jQuery" + getRandomInt(100000, 999999))] = data => {
+       price = data;
+    };
+    console.log(defaultInfo.cookieData)
+    const result = await axios({
+      method: "get",
+      url: "http://p.3.cn/prices/mgets",
+      headers: defaultInfo.header,
+      params: {
+        type: 1,
+        pduid: new Date().getTime(),
+        skuIds: "J_" + stockId,
+        callback: name
+      }
+    });
+
+    eval("callback." + result.data);
+    console.log(price)
+    console.log(name)
+    console.log(result)
+    console.log("XXXX")
+    return price
+
+}
+
+
+
+async function goodInfo(targetURl){
+    const result = await axios({
+        method: "get",
+        url: targetURl,
+        headers: defaultInfo.header,
+        params: {
+        appid: 133,
+        size: 147,
+        t: Date.now()
+      },
+      responseType: "arraybuffer"
+    });
+    // console.log(iconv.decode(result.data,"utf-8"))
+    // await writeAndOpenFile("qr.html",result.data);
+    return result
+}
+
+
+
 
 async function runSearch(){
     const tmpURL = "https://item.jd.com/68155926685.html"
-    console.log("SDSDSDSD")
+    // await goodInfo(tmpURL)
+    try {
+        let flag = true
+        
+        const all = await Promise.all([
+            goodPrice("68155926685"),
+            goodInfo(tmpURL)
+        ])
+        
+        //获取价格
+        console.log(all[0][0].p)
+        const body = cheerio.load(all[1].data,"utf-8")
+        // 获取名称
+        console.log(body("div.sku-name").text())
+
+        // 获取详情
+        let oneList = body('div.p-parameter').text().split('\n')
+        oneList.forEach(function(item,index){
+            console.log(item.trim())
+            console.log("XXXX")
+        })
+        let tmpList = body('div.Ptable').text().split("\n")
+        tmpList.forEach(function(item,index){
+            console.log(item.trim())
+            console.log("XXXCC")
+        })
+
+        // 获取轮播放图片
+        let urlList = body('ul.lh').toArray()
+        urlList.forEach(function(item,index){
+            item.children.forEach(function(item,index){
+                if(item.name == "li"){
+                    item.children.forEach(function(item,index){
+                        if(item.name == "img"){
+                            console.log(item.attribs.src)
+                        }
+                    })
+                }
+
+            })
+            
+        })
+
+
+
+
+
+
+    } catch(error){
+        return Promise.reject(error)
+    }
 }
 
 async function login(ticket){
